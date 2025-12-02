@@ -1,0 +1,55 @@
+body {
+    font-family: Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    gap: 20px;
+}
+
+#tablero {
+    display: grid;
+    gap: 10px;
+}
+
+.fila {
+    display: flex;
+    gap: 8px;
+}
+
+.letra {
+    width: 50px;
+    height: 50px;
+    font-size: 32px;
+    text-align: center;
+    text-transform: uppercase;
+    border: 2px solid #ccc;
+    border-radius: 6px;
+    outline: none;
+}
+
+/* Colores estilo Wordle */
+.verde {
+    background-color: #6aaa64;
+    color: white;
+    border-color: #6aaa64;
+}
+
+.amarillo {
+    background-color: #c9b458;
+    color: white;
+    border-color: #c9b458;
+}
+
+.gris {
+    background-color: #787c7e;
+    color: white;
+    border-color: #787c7e;
+}
+
+/* estilo para inputs desactivados */
+.letra.desactivada {
+    opacity: 0.9;
+    pointer-events: none;
+}
