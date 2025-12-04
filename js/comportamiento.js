@@ -1,50 +1,98 @@
 // js/comportamiento.js
 
-const palabraSecreta = "PERRO"; // pon la que quieras
+// Config
+let palabraSecreta = ""; // se llenará desde la API
 let filaActual = 0;
-const filas = document.querySelectorAll(".fila");
+const MAX_FILAS = 6;
+const LONGITUD = 5;
 
-// Inicializar listeners en todas las filas (solo necesidades de movimiento/input)
-filas.forEach((fila, filaIndex) => {
-    const inputs = Array.from(fila.querySelectorAll("input"));
 
-    inputs.forEach((input, i) => {
-        // Forzar mayúscula y limitar a 1 carácter, además de avanzar si corresponde
-        input.addEventListener("input", (e) => {
-            // normalizar valor
-            input.value = (input.value || "").toUpperCase().slice(0, 1);
+// Cargar palabra desde la API
+async function cargarPalabra() {
+    try {
+        const respuesta = await fetch("https://random-word-api.herokuapp.com/word?lang=es&length=5");
+        const datos = await respuesta.json();
+        if (Array.isArray(datos) && datos[0]) {
+            palabraSecreta = datos[0].toUpperCase();
+        } else {
+            throw new Error("Respuesta inesperada de la API");
+        }
+    } catch (err) {
+        console.error("Error al cargar palabra desde la API:", err);
+        palabraSecreta = "PERRO"; // fallback
+    } finally {
+        console.log("Palabra secreta:", palabraSecreta);
+        // enfocar la primera casilla cuando todo esté listo
+        const primera = document.querySelector(".fila input");
+        if (primera) primera.focus();
+    }
+}
+cargarPalabra();
 
-            // Si se ha escrito 1 carácter y no es la última casilla → avanzar foco
-            if (input.value.length === 1 && i < inputs.length - 1) {
-                inputs[i + 1].focus();
-            }
-        });
 
-        // PREVENCIÓN de caracteres no alfabéticos con keydown (opcional)
-        input.addEventListener("keypress", (e) => {
-            // permitir solo letras
-            if (!/^[a-zA-Z]$/.test(e.key)) {
-                e.preventDefault();
-            }
+// Helpers DOM
+function filasNodeList() {
+    return document.querySelectorAll(".fila");
+}
+
+function inputsDeFila(index) {
+    const filas = filasNodeList();
+    const fila = filas[index];
+    return fila ? Array.from(fila.querySelectorAll("input")) : [];
+}
+
+
+// Inicializar filas: eventos input y keypress
+inicializarFilas();
+
+function inicializarFilas() {
+    const filas = filasNodeList();
+    filas.forEach((fila, filaIndex) => {
+        const inputs = Array.from(fila.querySelectorAll("input"));
+        inputs.forEach((input, i) => {
+            // Input: normalizar mayúscula y limitar 1 char
+            input.addEventListener("input", (e) => {
+                // Normalizar: forzar mayúscula, recortar a 1
+                input.value = (input.value || "").toUpperCase().slice(0, 1);
+
+                // Si escribimos una letra y no es el último -> avanzar foco dentro de la MISMA fila
+                if (input.value.length === 1 && i < inputs.length - 1) {
+                    inputs[i + 1].focus();
+                }
+            });
+
+            // Permitir letras españolas (incluye ñ y vocales acentuadas)
+            input.addEventListener("keypress", (e) => {
+                // tecla puede ser más de 1 car (ej: dead keys), comprobamos la propiedad key
+                const key = e.key || "";
+                // permitir letras A-Z, a-z, ñÑ, y vocales acentuadas
+                if (!/^[a-zA-ZñÑáéíóúÁÉÍÓÚ]$/.test(key)) {
+                    e.preventDefault();
+                }
+            });
         });
     });
-});
+}
 
-// Manejo de teclas globalmente (solo actuará cuando el target sea un input)
+
+// Navegación teclado físico: Backspace y Enter (con setTimeout para última letra)
 document.addEventListener("keydown", (event) => {
     const target = event.target;
+
+    // Si no estamos dentro de un input del tablero, ignorar excepto teclas generales
     if (!target || target.tagName !== "INPUT") return;
 
     const fila = target.parentElement;
     const inputs = Array.from(fila.querySelectorAll("input"));
     const index = inputs.indexOf(target);
 
-    // BACKSPACE: si el input está vacío, retrocede al anterior y borra
+    // BACKSPACE
     if (event.key === "Backspace") {
-        // Si tiene valor, dejar que el navegador lo borre (no interferimos)
+        // Si la casilla tiene valor, dejar que el navegador la borre (no interferimos)
+        // Si está vacía -> retroceder y borrar anterior
         if (target.value === "") {
             if (index > 0) {
-                event.preventDefault(); // prevenimos el comportamiento por seguridad
+                event.preventDefault();
                 inputs[index - 1].focus();
                 inputs[index - 1].value = "";
             }
@@ -52,46 +100,122 @@ document.addEventListener("keydown", (event) => {
         return;
     }
 
-    // ENTER: queremos comprobar la fila.
-    // Usamos setTimeout 0 para asegurarnos de que cualquier evento 'input'
-    // que esté aún por procesar (ej: al escribir la 5ª letra) termine primero.
+    // ENTER -> comprobar fila; usamos setTimeout 0 para que si hay un 'input'
+    // pendiente (ej: el usuario tecleó la 5ª letra y rápidamente ENTER),
+    // ese input se procese antes de leer los valores.
     if (event.key === "Enter") {
         event.preventDefault();
         setTimeout(() => {
             comprobarFila();
         }, 0);
+        return;
     }
 });
 
-// Función que comprueba la fila actual (colores y avance)
+// -----------------------------
+// Avanzar foco programáticamente cuando usamos teclado virtual
+// -----------------------------
+function dispatchInputEvent(element) {
+    const ev = new Event('input', { bubbles: true });
+    element.dispatchEvent(ev);
+}
+
+// -----------------------------
+// TECLADO VIRTUAL
+// -----------------------------
+function inicializarTeclado() {
+    const teclado = document.getElementById("teclado");
+    if (!teclado) return;
+
+    teclado.addEventListener("click", (e) => {
+        const btn = e.target.closest("button[data-key]");
+        if (!btn) return;
+        const key = btn.dataset.key;
+
+        if (key === "ENTER") {
+            // igual que pulsar Enter
+            setTimeout(() => comprobarFila(), 0);
+            return;
+        }
+
+        if (key === "BACK") {
+            borrarLetra();
+            return;
+        }
+
+        // letra
+        escribirLetra(key);
+    });
+}
+
+// Escribir letra desde teclado virtual
+function escribirLetra(letra) {
+    const inputs = inputsDeFila(filaActual);
+    if (inputs.length === 0) return;
+
+    // buscar primer input vacío
+    for (let i = 0; i < inputs.length; i++) {
+        if (!inputs[i].value) {
+            inputs[i].value = letra.toUpperCase().slice(0,1);
+
+            // dispatch input para que se comporte como si el usuario hubiese escrito
+            dispatchInputEvent(inputs[i]);
+
+            // si no es el último, avanzar foco
+            if (i < inputs.length - 1) inputs[i + 1].focus();
+            else inputs[i].focus();
+
+            break;
+        }
+    }
+}
+
+// Borrar letra desde teclado virtual
+function borrarLetra() {
+    const inputs = inputsDeFila(filaActual);
+    if (inputs.length === 0) return;
+
+    // buscar último input lleno
+    for (let i = inputs.length - 1; i >= 0; i--) {
+        if (inputs[i].value) {
+            inputs[i].value = "";
+            inputs[i].focus();
+            dispatchInputEvent(inputs[i]); // por si hay lógica dependiente
+            break;
+        }
+    }
+}
+
+// -----------------------------
+// Comprobar fila actual (colores y teclado virtual)
+// -----------------------------
 function comprobarFila() {
-    const filasNode = document.querySelectorAll(".fila");
-    const fila = filasNode[filaActual];
+    const filas = filasNodeList();
+    const fila = filas[filaActual];
     if (!fila) return;
 
     const inputs = Array.from(fila.querySelectorAll("input"));
 
-    // Construir la palabra tal cual están los inputs AHORA
+    // leer valores AHORA (tras cualquier input pendiente)
     const intentoArr = inputs.map(inp => (inp.value || "").toUpperCase().trim());
-    const intento = intentoArr.join("");
-
-    // Comprobar que no haya inputs vacíos
     const hayVacio = intentoArr.some(ch => ch === "" || ch.length !== 1);
+
     if (hayVacio) {
-        alert("Debes introducir las 5 letras antes de pulsar ENTER.");
-        // enfocar el primer vacío para ayudar al usuario
+        // enfocar primer vacío para ayudar al usuario
         const primerVacio = inputs.find(inp => !inp.value);
         if (primerVacio) primerVacio.focus();
+        alert("Debes introducir las 5 letras antes de pulsar ENTER.");
         return;
     }
 
-    // Lógica de colores: verdes primero, luego amarillos (respetando repeticiones)
-    const estado = Array(5).fill(""); // "verde","amarillo","gris"
+    const intento = intentoArr.join("");
+    // algoritmo: verdes primero, luego amarillos respetando repeticiones
+    const estado = Array(LONGITUD).fill(""); // "verde","amarillo","gris"
     const secretoArray = palabraSecreta.split("");
-    const usado = Array(5).fill(false);
+    const usado = Array(LONGITUD).fill(false);
 
     // 1) Verdes
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < LONGITUD; i++) {
         if (intentoArr[i] === secretoArray[i]) {
             estado[i] = "verde";
             usado[i] = true;
@@ -99,11 +223,11 @@ function comprobarFila() {
     }
 
     // 2) Amarillos
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < LONGITUD; i++) {
         if (estado[i] === "") {
             const letra = intentoArr[i];
             let encontrado = false;
-            for (let j = 0; j < 5; j++) {
+            for (let j = 0; j < LONGITUD; j++) {
                 if (!usado[j] && secretoArray[j] === letra) {
                     encontrado = true;
                     usado[j] = true;
@@ -114,26 +238,70 @@ function comprobarFila() {
         }
     }
 
-    // Aplicar clases y bloquear inputs de esa fila
+    // Aplicar clases a inputs y bloquearlos
     for (let i = 0; i < inputs.length; i++) {
-        inputs[i].classList.add(estado[i]);
-        inputs[i].classList.add("desactivada");
+        inputs[i].classList.add(estado[i]);         // .verde/.amarillo/.gris
+        inputs[i].classList.add("desactivada");    // estilo visual
         inputs[i].disabled = true;
     }
 
-    // Si acertó, notificar y terminar
+    // Actualizar teclado virtual según estado (prioridad verde > amarillo > gris)
+    for (let i = 0; i < LONGITUD; i++) {
+        marcarTecla(intentoArr[i], estado[i]);
+    }
+
+    // Si ganó
     if (estado.every(s => s === "verde")) {
-        setTimeout(() => alert("¡Correcto!"), 50);
+        setTimeout(() => alert("¡Correcto! La palabra era: " + palabraSecreta), 50);
         return;
     }
 
-    // Avanzar filaActual y enfocar la primera casilla de la siguiente (si existe)
+    // Avanzar fila actual y enfocar la primera casilla de la siguiente
     filaActual++;
-    if (filaActual < filasNode.length) {
-        const siguienteFila = filasNode[filaActual];
-        const primerInput = siguienteFila.querySelector("input");
-        if (primerInput) primerInput.focus();
+    if (filaActual < filas.length) {
+        const siguienteInputs = inputsDeFila(filaActual);
+        if (siguienteInputs.length > 0) siguienteInputs[0].focus();
     } else {
         setTimeout(() => alert("Se acabaron los intentos. La palabra era: " + palabraSecreta), 50);
     }
 }
+
+// -----------------------------
+// Marcar tecla en teclado virtual con prioridad
+// -----------------------------
+function marcarTecla(letraRaw, estado) {
+    if (!letraRaw) return;
+    const letra = letraRaw.toUpperCase();
+
+    // Buscar botón correspondiente (data-key). Asegúrate que el HTML del teclado
+    // tiene botones con data-key="A" ... y data-key="Ñ", y BACK/ENTER.
+    const selector = `#teclado button[data-key="${letra}"]`;
+    const boton = document.querySelector(selector);
+    if (!boton) return;
+
+    // prioridad verde > amarillo > gris
+    if (estado === "verde") {
+        boton.classList.remove("tecla-amarilla", "tecla-gris");
+        boton.classList.add("tecla-verde");
+    } else if (estado === "amarillo") {
+        if (!boton.classList.contains("tecla-verde")) {
+            boton.classList.remove("tecla-gris");
+            boton.classList.add("tecla-amarilla");
+        }
+    } else { // gris
+        if (!boton.classList.contains("tecla-verde") && !boton.classList.contains("tecla-amarilla")) {
+            boton.classList.add("tecla-gris");
+        }
+    }
+}
+
+// -----------------------------
+// Opcional: exponer funciones en global para debugging
+// -----------------------------
+window._wordle = {
+    cargarPalabra,
+    escribirLetra,
+    borrarLetra,
+    comprobarFila,
+    getPalabraSecreta: () => palabraSecreta
+};
