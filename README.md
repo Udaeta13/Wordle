@@ -14,5 +14,9 @@
 | Ligue          | VVVVV     |
 
 [Github](https://github.com/Udaeta13/Wordle)  
-![Logo Wordle]([https://www.google.com/url?sa=i&url=https%3A%2F%2F1000logos.net%2Fwordle-logo%2F&psig=AOvVaw1Xxmt7uIqK83SMLpXJYamw&ust=1765541948400000&source=images&cd=vfe&opi=89978449&ved=0CBIQjRxqFwoTCKDAxLfCtZEDFQAAAAAdAAAAABAE](https://www.internetmatters.org/hub/esafety-news/what-is-the-wordle-game/))
+![Logo Wordle](https://1000logos.net/wp-content/uploads/2023/05/Wordle-Emblem.png)
 
+```javascript
+const salsa = "salsa";
+console.log("Hola, " + salsa);
+```
