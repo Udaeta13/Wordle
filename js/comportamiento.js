@@ -1,10 +1,19 @@
-// js/comportamiento.js
 
-// Config
-let palabraSecreta = ""; // se llenará desde la API
+// Configuracion inicial
+let palabraSecreta = ""; // se llena desde la API
 let filaActual = 0;
 const MAX_FILAS = 6;
 const LONGITUD = 5;
+
+// Quitar tildes de una palabra
+function quitarTildes(palabra) {
+    return palabra
+        .replace(/[á]/gi, "a")
+        .replace(/[é]/gi, "e")
+        .replace(/[í]/gi, "i")
+        .replace(/[ó]/gi, "o")
+        .replace(/[ú]/gi, "u");
+}
 
 
 // Cargar palabra desde la API
@@ -12,22 +21,25 @@ async function cargarPalabra() {
     try {
         const respuesta = await fetch("https://random-word-api.herokuapp.com/word?lang=es&length=5");
         const datos = await respuesta.json();
+
         if (Array.isArray(datos) && datos[0]) {
-            palabraSecreta = datos[0].toUpperCase();
+            palabraSecreta = quitarTildes(datos[0]).toUpperCase();
         } else {
             throw new Error("Respuesta inesperada de la API");
         }
+
     } catch (err) {
         console.error("Error al cargar palabra desde la API:", err);
-        palabraSecreta = "PERRO"; // fallback
+        palabraSecreta = "PERRO";
     } finally {
         console.log("Palabra secreta:", palabraSecreta);
-        // enfocar la primera casilla cuando todo esté listo
         const primera = document.querySelector(".fila input");
         if (primera) primera.focus();
     }
 }
+
 cargarPalabra();
+
 
 
 // Helpers DOM
@@ -112,17 +124,14 @@ document.addEventListener("keydown", (event) => {
     }
 });
 
-// -----------------------------
-// Avanzar foco programáticamente cuando usamos teclado virtual
-// -----------------------------
+
+// Mover foco programáticamente cuando usamos teclado virtual
 function dispatchInputEvent(element) {
     const ev = new Event('input', { bubbles: true });
     element.dispatchEvent(ev);
 }
 
-// -----------------------------
-// TECLADO VIRTUAL
-// -----------------------------
+// Tecado virtual
 function inicializarTeclado() {
     const teclado = document.getElementById("teclado");
     if (!teclado) return;
@@ -175,20 +184,19 @@ function borrarLetra() {
     const inputs = inputsDeFila(filaActual);
     if (inputs.length === 0) return;
 
-    // buscar último input lleno
+    // buscar ultimo input lleno
     for (let i = inputs.length - 1; i >= 0; i--) {
         if (inputs[i].value) {
             inputs[i].value = "";
             inputs[i].focus();
-            dispatchInputEvent(inputs[i]); // por si hay lógica dependiente
+            dispatchInputEvent(inputs[i]);
             break;
         }
     }
 }
 
-// -----------------------------
+
 // Comprobar fila actual (colores y teclado virtual)
-// -----------------------------
 function comprobarFila() {
     const filas = filasNodeList();
     const fila = filas[filaActual];
@@ -266,15 +274,13 @@ function comprobarFila() {
     }
 }
 
-// -----------------------------
+
 // Marcar tecla en teclado virtual con prioridad
-// -----------------------------
 function marcarTecla(letraRaw, estado) {
     if (!letraRaw) return;
     const letra = letraRaw.toUpperCase();
 
-    // Buscar botón correspondiente (data-key). Asegúrate que el HTML del teclado
-    // tiene botones con data-key="A" ... y data-key="Ñ", y BACK/ENTER.
+    // Buscar boton correspondiente (data-key). Si no existe, salir
     const selector = `#teclado button[data-key="${letra}"]`;
     const boton = document.querySelector(selector);
     if (!boton) return;
@@ -295,9 +301,8 @@ function marcarTecla(letraRaw, estado) {
     }
 }
 
-// -----------------------------
+
 // Opcional: exponer funciones en global para debugging
-// -----------------------------
 window._wordle = {
     cargarPalabra,
     escribirLetra,
